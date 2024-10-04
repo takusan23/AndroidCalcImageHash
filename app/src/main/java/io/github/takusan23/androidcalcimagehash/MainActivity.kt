@@ -8,22 +8,32 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import io.github.takusan23.androidcalcimagehash.ui.theme.AndroidCalcImageHashTheme
 import kotlinx.coroutines.launch
 
@@ -55,8 +65,8 @@ private fun MainScreen() {
     val scope = rememberCoroutineScope()
 
     // 画像の Uri
-    var image1Uri = remember<Uri?> { null }
-    var image2Uri = remember<Uri?> { null }
+    var image1Uri = remember { mutableStateOf<Uri?>(null) }
+    var image2Uri = remember { mutableStateOf<Uri?>(null) }
 
     // 画像それぞれの aHash、dHash
     val aHash1 = remember { mutableStateOf(0UL) }
@@ -70,17 +80,17 @@ private fun MainScreen() {
 
     val photoPicker1 = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> image1Uri = uri }
+        onResult = { uri -> image1Uri.value = uri }
     )
     val photoPicker2 = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> image2Uri = uri }
+        onResult = { uri -> image2Uri.value = uri }
     )
 
     fun compare() {
         scope.launch {
-            val image1Bitmap = ImageHashTool.loadBitmap(context, image1Uri!!)!!
-            val image2Bitmap = ImageHashTool.loadBitmap(context, image2Uri!!)!!
+            val image1Bitmap = ImageHashTool.loadBitmap(context, image1Uri.value!!)!!
+            val image2Bitmap = ImageHashTool.loadBitmap(context, image2Uri.value!!)!!
 
             // それぞれ aHash dHash を求める
             aHash1.value = ImageHashTool.calcAHash(image1Bitmap)
@@ -123,6 +133,27 @@ private fun MainScreen() {
                 Text(text = "一致度を計算")
             }
 
+            Row {
+                if (image1Uri.value != null) {
+                    Column {
+                        Text(text = "1枚目")
+                        UriImagePreview(
+                            modifier = Modifier.requiredSize(100.dp),
+                            uri = image1Uri.value!!
+                        )
+                    }
+                }
+                if (image2Uri.value != null) {
+                    Column {
+                        Text(text = "2枚目")
+                        UriImagePreview(
+                            modifier = Modifier.requiredSize(100.dp),
+                            uri = image2Uri.value!!
+                        )
+                    }
+                }
+            }
+
             Text(text = "それぞれの aHash dHash")
             Text(text = "aHash1 = ${aHash1.value.toBinaryString()}")
             Text(text = "dHash1 = ${dHash1.value.toBinaryString()}")
@@ -133,6 +164,36 @@ private fun MainScreen() {
             Text(text = "aHash = ${compareAHash.floatValue}")
             Text(text = "dHash = ${compareDHash.floatValue}")
 
+        }
+    }
+}
+
+/** Uri の画像を表示する */
+@Composable
+private fun UriImagePreview(
+    modifier: Modifier = Modifier,
+    uri: Uri
+) {
+    val context = LocalContext.current
+    val image = remember { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(key1 = uri) {
+        // TODO 自分で Bitmap を読み込むのではなく、Glide や Coil を使うべきです
+        image.value = ImageHashTool.loadBitmap(context, uri)?.asImageBitmap()
+    }
+
+    if (image.value != null) {
+        Image(
+            modifier = modifier,
+            bitmap = image.value!!,
+            contentDescription = null
+        )
+    } else {
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
         }
     }
 }
